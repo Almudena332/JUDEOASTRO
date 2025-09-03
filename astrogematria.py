@@ -84,8 +84,8 @@ VALENCE_WEIGHTS = {  # Calidad (firma del aspecto)
 
 # Naturaleza del planeta para Calidad (–1..+1)
 PLANET_VALENCE = {
-    'Jupiter':  +1.0, 'Venus':  +0.9, 'Sun': +0.7, 'Moon': +0.6, 'Mercury': +0.2,
-    'Mars':    -0.7, 'Saturn': -0.9, 'Uranus': -0.3, 'Neptune': -0.3, 'Pluto': -0.6
+    'Jupiter':  +2.0, 'Venus':  +1.5, 'Sun': +1.2, 'Moon': +0.9, 'Mercury': +0.7,
+    'Mars':    -1.5, 'Saturn': -2.0, 'Uranus': -0.5, 'Neptune': -0.5, 'Pluto': -0.8
 }
 
 LUMINARIES = {'Sun', 'Moon'}
@@ -480,4 +480,5 @@ if __name__ == "__main__":
         print(f"\n[ERROR] {e}")
     finally:
         input("\nPulsa Enter para salir…")
+
 
