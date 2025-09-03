@@ -13,8 +13,9 @@ from astrogematria import (
 )
 
 ALLOW_ORIGINS = [
-    "http://almudenacuervo.local",  # tu WP local
-    "https://enastrologico.com"     # producción
+  "http://almudenacuervo.local",
+  "https://enastrologico.com",
+  "https://www.enastrologico.com"  # añade si usas www
 ]
 
 app.add_middleware(
@@ -69,5 +70,6 @@ def evaluate(req: EvalRequest):
 
     res = evalua_termino_con_carta(req.term, posiciones)
     return {"zone": zona, "lat": lat_str, "lon": lon_str, "positions": posiciones, "result": res}
+
 
 
