@@ -12,17 +12,19 @@ from astrogematria import (
     obtener_posiciones, evalua_termino_con_carta
 )
 
-ALLOW_ORIGINS = ["*"]  # TEMP para descartar CORS
+ALLOW_ORIGINS = [
+    "http://almudenacuervo.local",  # tu WP local
+    "https://enastrologico.com"     # producción
+]
 
-
-app = FastAPI(title="Astrogematría API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOW_ORIGINS,
-    allow_credentials= False,
+    allow_credentials=True,   # vuelve a True
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 class Birth(BaseModel):
     date: str  # YYYY/MM/DD
@@ -67,4 +69,5 @@ def evaluate(req: EvalRequest):
 
     res = evalua_termino_con_carta(req.term, posiciones)
     return {"zone": zona, "lat": lat_str, "lon": lon_str, "positions": posiciones, "result": res}
+
 
