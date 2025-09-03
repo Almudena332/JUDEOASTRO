@@ -33,11 +33,11 @@ VALORES_ASTROGEMATRIA = {
 
 # Orbes pequeños
 ASPECTOS = {
-    'conjuncion': {'angulo': 0,   'orbe': 3, 'peso': +4},
-    'oposicion':  {'angulo': 180, 'orbe': 3, 'peso': -2},
-    'trigono':    {'angulo': 120, 'orbe': 3, 'peso': +2},
-    'cuadratura': {'angulo': 90,  'orbe': 3, 'peso': -2},
-    'sextil':     {'angulo': 60,  'orbe': 2, 'peso': +1}
+    'conjuncion': {'angulo': 0,   'orbe': 5, 'peso': +4},
+    'oposicion':  {'angulo': 180, 'orbe': 5, 'peso': -2},
+    'trigono':    {'angulo': 120, 'orbe': 5, 'peso': +2},
+    'cuadratura': {'angulo': 90,  'orbe': 5, 'peso': -2},
+    'sextil':     {'angulo': 60,  'orbe': 4, 'peso': +1}
 }
 
 PESO_PLANETA = {
@@ -480,3 +480,4 @@ if __name__ == "__main__":
         print(f"\n[ERROR] {e}")
     finally:
         input("\nPulsa Enter para salir…")
+
