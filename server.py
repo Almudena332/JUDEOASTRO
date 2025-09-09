@@ -61,21 +61,33 @@ def _to360(x: float) -> float:
     v = x % 360.0
     return v + 360.0 if v < 0 else v
 
+def _resolve_coords(b: Birth):
+    """Devuelve (lat_str, lon_str, lat_f, lon_f). Lanza 400 si faltan datos."""
+    lat_str = lon_str = None
+    lat_f = lon_f = None
+
+    # 1) Geocoding si hay city/country
+    if (b.city or b.country):
+        geo = geocode_city(b.city or "", b.country or "")
+        if geo:
+            lat_str, lon_str, lat_f, lon_f = geo
+
+    # 2) Si no hubo geocoding, exige lat/lon
+    if not lat_str:
+        if not (b.lat and b.lon):
+            raise HTTPException(400, "Faltan city/country o lat/lon")
+        lat_str, lon_str, lat_f, lon_f = parse_geopos(b.lat, b.lon)
+
+    return lat_str, lon_str, lat_f, lon_f
+
+
 def _resolve_tz_offset(date_str: str, time_str: str, lat_f: float, lon_f: float) -> str:
     try:
         dt_local = datetime.strptime(f"{date_str} {time_str}", "%Y/%m/%d %H:%M")
     except ValueError:
         raise HTTPException(400, "Fecha/Hora inválidas. Usa YYYY/MM/DD y HH:MM.")
 
-    try:
-        zona = tz_offset_from_coords(dt_local, lat_f, lon_f)
-        if not zona:
-            print("[tz] tz_offset_from_coords devolvió None; uso fallback +01:00")
-            return "+01:00"
-        return zona
-    except Exception as e:
-        print(f"[tz] ERROR resolviendo zona horaria: {e}. Fallback +01:00")
-        return "+01:00"
+    return tz_offset_from_coords(dt_local, lat_f, lon_f) or "+01:00"
 
 # ---------------------------
 # Endpoints
@@ -159,6 +171,7 @@ def evaluate(req: EvalRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+
 
 
 
