@@ -92,7 +92,7 @@ def _resolve_tz_offset(date_str: str, time_str: str, lat_f: float, lon_f: float)
 # ---------------------------
 # Endpoints
 # ---------------------------
-@app.get("/healthz")
+@app.api_route("/healthz", methods=["GET", "HEAD", "OPTIONS"])
 def healthz():
     return {"ok": True}
 
@@ -171,6 +171,7 @@ def evaluate(req: EvalRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+
 
 
 
