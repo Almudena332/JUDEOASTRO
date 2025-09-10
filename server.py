@@ -4,7 +4,6 @@
 import os, sys, json, importlib
 from datetime import datetime
 from typing import Optional, Dict, Any
-
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,12 +11,13 @@ from pydantic import BaseModel
 
 app = FastAPI(title="Astro API", version="1.0.0")
 
-# --- CORS: cubre localhost, almudenacuervo.local y tus .com (con/sin www) ---
+# --- CORS abierto TEMPORALMENTE para diagnóstico ---
+# Importante: allow_credentials=False cuando allow_origins=["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https?://(localhost(:\d+)?|almudenacuervo\.local(:\d+)?|(www\.)?(vivirenastrologico|enastrologico)\.com)$",
-    allow_credentials=True,
-    allow_methods=["GET","POST","OPTIONS"],
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -27,7 +27,7 @@ class Birth(BaseModel):
     time: str  # "HH:MM"
     city: Optional[str] = None
     country: Optional[str] = None
-    lat: Optional[str] = None  # acepta decimal o DMS
+    lat: Optional[str] = None
     lon: Optional[str] = None
 
 class EvalRequest(BaseModel):
@@ -43,10 +43,8 @@ def _sanitize(obj: Any) -> Any:
     if obj is None or isinstance(obj, (bool,int,float,str)):
         return obj
     if hasattr(obj, "lon"):
-        try:
-            return float(obj.lon)
-        except:
-            pass
+        try: return float(obj.lon)
+        except: pass
     if isinstance(obj, dict):
         return {str(k): _sanitize(v) for k,v in obj.items()}
     if isinstance(obj, (list,tuple)):
@@ -108,7 +106,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         pass
     return JSONResponse(status_code=500, content={"error":"internal_error","detail":str(exc)})
 
-# ------------------- Rutas básicas -------------------
+# --------- Extras útiles para diagnosticar ----------
 @app.get("/")
 def root():
     return {"ok": True, "service": "astro-api", "version": app.version}
@@ -123,13 +121,7 @@ def version():
 
 @app.get("/diag")
 def diag():
-    """Diagnóstico rápido para Render."""
-    info = {
-        "python": sys.version,
-        "cwd": os.getcwd(),
-        "env_PORT": os.getenv("PORT"),
-        "installed": {},
-    }
+    info = {"python": sys.version, "cwd": os.getcwd(), "env_PORT": os.getenv("PORT"), "installed": {}}
     for m in ["flatlib","pyswisseph","timezonefinder","tzdata","geopy"]:
         try:
             importlib.import_module(m)
@@ -137,6 +129,10 @@ def diag():
         except Exception as e:
             info["installed"][m] = f"missing/err: {e}"
     return info
+
+@app.get("/echo-origin")
+def echo_origin(request: Request):
+    return {"origin": request.headers.get("origin")}
 
 # ------------------- Endpoints principales -------------------
 @app.post("/chart")
@@ -149,16 +145,14 @@ def chart(req: Birth):
 
     dt = dtmod.Datetime(req.date, req.time, zona)
     pos = geop.GeoPos(lat_str, lon_str)
-    # CASAS IGUALES para cuadrar con la UI
+    # CASAS IGUALES
     ch = chart_mod.Chart(dt, pos, hsys=const.HOUSES_EQUAL)
 
     posiciones: Dict[str, Any] = _sanitize(astro.obtener_posiciones(ch))
-
     planets_keys = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto']
     planets = {k: _to360(float(posiciones[k])) for k in planets_keys if k in posiciones}
     angles = {"ASC": _to360(float(posiciones['Asc'])), "MC": _to360(float(posiciones['MC']))}
     houses = [_to360(float(ch.houses[i].lon)) for i in range(1,13)]
-
     return {"planets": planets, "angles": angles, "houses": houses, "zone": zona}
 
 @app.post("/evaluate")
@@ -175,13 +169,11 @@ def evaluate(req: EvalRequest):
 
     posiciones = _sanitize(astro.obtener_posiciones(ch))
     res = _sanitize(astro.evalua_termino_con_carta(req.term, posiciones))
-
     return {"zone": zona, "lat": lat_str, "lon": lon_str, "positions": posiciones, "result": res}
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), log_level="debug")
-
 
 
 
