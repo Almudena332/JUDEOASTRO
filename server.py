@@ -4,15 +4,15 @@
 import os, sys, json, importlib
 from datetime import datetime
 from typing import Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="Astro API", version="1.0.0")
 
-# --- CORS abierto TEMPORALMENTE para diagnóstico ---
-# Importante: allow_credentials=False cuando allow_origins=["*"]
+# --- CORS ABIERTO (diagnóstico) ---
+# Nota: con "*" -> allow_credentials debe ser False
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,6 +20,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- EXTRA: responder explícitamente a TODOS los preflights ---
+@app.options("/{rest_of_path:path}")
+def preflight_catch_all(rest_of_path: str):
+    return Response(
+        status_code=204,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Vary": "Origin",
+        },
+    )
 
 # ------------------- Modelos -------------------
 class Birth(BaseModel):
@@ -104,9 +117,14 @@ async def global_exception_handler(request: Request, exc: Exception):
         import traceback; traceback.print_exc()
     except Exception:
         pass
-    return JSONResponse(status_code=500, content={"error":"internal_error","detail":str(exc)})
+    # Añadimos CORS por si acaso en errores también
+    return JSONResponse(
+        status_code=500,
+        content={"error":"internal_error","detail":str(exc)},
+        headers={"Access-Control-Allow-Origin": "*", "Vary": "Origin"}
+    )
 
-# --------- Extras útiles para diagnosticar ----------
+# --------- Rutas util ----------
 @app.get("/")
 def root():
     return {"ok": True, "service": "astro-api", "version": app.version}
@@ -134,20 +152,16 @@ def diag():
 def echo_origin(request: Request):
     return {"origin": request.headers.get("origin")}
 
-# ------------------- Endpoints principales -------------------
+# --------- Endpoints principales ---------
 @app.post("/chart")
 def chart(req: Birth):
     chart_mod, dtmod, geop, const = _lazy_flatlib()
     astro = _lazy_astro()
-
     lat_str, lon_str, lat_f, lon_f = _resolve_coords(astro, req)
     zona = _resolve_tz(astro, req.date, req.time, lat_f, lon_f)
-
     dt = dtmod.Datetime(req.date, req.time, zona)
     pos = geop.GeoPos(lat_str, lon_str)
-    # CASAS IGUALES
-    ch = chart_mod.Chart(dt, pos, hsys=const.HOUSES_EQUAL)
-
+    ch = chart_mod.Chart(dt, pos, hsys=const.HOUSES_EQUAL)  # CASAS IGUALES
     posiciones: Dict[str, Any] = _sanitize(astro.obtener_posiciones(ch))
     planets_keys = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto']
     planets = {k: _to360(float(posiciones[k])) for k in planets_keys if k in posiciones}
@@ -159,14 +173,11 @@ def chart(req: Birth):
 def evaluate(req: EvalRequest):
     chart_mod, dtmod, geop, const = _lazy_flatlib()
     astro = _lazy_astro()
-
     lat_str, lon_str, lat_f, lon_f = _resolve_coords(astro, req.birth)
     zona = _resolve_tz(astro, req.birth.date, req.birth.time, lat_f, lon_f)
-
     dt = dtmod.Datetime(req.birth.date, req.birth.time, zona)
     pos = geop.GeoPos(lat_str, lon_str)
     ch = chart_mod.Chart(dt, pos, hsys=const.HOUSES_EQUAL)
-
     posiciones = _sanitize(astro.obtener_posiciones(ch))
     res = _sanitize(astro.evalua_termino_con_carta(req.term, posiciones))
     return {"zone": zona, "lat": lat_str, "lon": lon_str, "positions": posiciones, "result": res}
@@ -174,6 +185,7 @@ def evaluate(req: EvalRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), log_level="debug")
+
 
 
 
