@@ -23,19 +23,13 @@ from astrogematria import (
 # ---------------------------
 app = FastAPI(title="Astro API", version="1.0.0")
 
-ALLOW_ORIGINS = [
-    "http://almudenacuervo.local",
-    "http://localhost",
-    "http://localhost:3000",
-    "https://enastrologico.com",
-    "https://www.enastrologico.com",
-]
-
+# Middleware CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOW_ORIGINS,
+    allow_origins=[],  # usamos regex en lugar de lista fija
+    allow_origin_regex=r"^https?://(localhost(:\d+)?|almudenacuervo\.local(:\d+)?|(www\.)?(vivirenastrologico|enastrologico)\.com)(:\d+)?$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET","POST","OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -171,6 +165,8 @@ def evaluate(req: EvalRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+
+
 
 
 
