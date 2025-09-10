@@ -6,4 +6,3 @@ timezonefinder
 tzdata
 pytz
 pyswisseph==2.10.3.2
-
