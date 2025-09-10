@@ -12,30 +12,38 @@ from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
 from flatlib import const
 
-# Importa utilidades desde tu módulo existente
+# Tu módulo existente (lo mantengo tal cual)
 from astrogematria import (
     geocode_city, parse_geopos, tz_offset_from_coords,
     obtener_posiciones, evalua_termino_con_carta
 )
 
-# ---------------------------
-# App + CORS
-# ---------------------------
 app = FastAPI(title="Astro API", version="1.0.0")
 
-# Middleware CORS
+# --- CORS a prueba de bombas ---
+ALLOWED = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://almudenacuervo.local",
+    "http://almudenacuervo.local:80",
+    "https://vivirenastrologico.com",
+    "http://vivirenastrologico.com",
+    "https://www.vivirenastrologico.com",
+    "http://www.vivirenastrologico.com",
+    "https://enastrologico.com",
+    "http://enastrologico.com",
+    "https://www.enastrologico.com",
+    "http://www.enastrologico.com",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[],  # usamos regex en lugar de lista fija
-    allow_origin_regex=r"^https?://(localhost(:\d+)?|almudenacuervo\.local(:\d+)?|(www\.)?(vivirenastrologico|enastrologico)\.com)(:\d+)?$",
+    allow_origins=ALLOWED,
     allow_credentials=True,
-    allow_methods=["GET","POST","OPTIONS"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
-# ---------------------------
-# Modelos
-# ---------------------------
+# --- Modelos ---
 class Birth(BaseModel):
     date: str            # "YYYY/MM/DD"
     time: str            # "HH:MM"
@@ -48,9 +56,7 @@ class EvalRequest(BaseModel):
     birth: Birth
     term: str
 
-# ---------------------------
-# Helpers
-# ---------------------------
+# --- Helpers ---
 def _to360(x: float) -> float:
     v = x % 360.0
     return v + 360.0 if v < 0 else v
@@ -74,18 +80,15 @@ def _resolve_coords(b: Birth):
 
     return lat_str, lon_str, lat_f, lon_f
 
-
 def _resolve_tz_offset(date_str: str, time_str: str, lat_f: float, lon_f: float) -> str:
     try:
         dt_local = datetime.strptime(f"{date_str} {time_str}", "%Y/%m/%d %H:%M")
     except ValueError:
         raise HTTPException(400, "Fecha/Hora inválidas. Usa YYYY/MM/DD y HH:MM.")
-
+    # por defecto +01:00 si no se puede resolver
     return tz_offset_from_coords(dt_local, lat_f, lon_f) or "+01:00"
 
-# ---------------------------
-# Endpoints
-# ---------------------------
+# --- Endpoints ---
 @app.api_route("/healthz", methods=["GET", "HEAD", "OPTIONS"])
 def healthz():
     return {"ok": True}
@@ -104,19 +107,19 @@ def chart(req: Birth):
       "houses": [deg x12],
       "zone": "+01:00"
     }
-    Grados en 0–360. Casas: Placidus.
+    Grados en 0–360. Casas: IGUALES (alineado con la UI).
     """
     # Coordenadas
     lat_str, lon_str, lat_f, lon_f = _resolve_coords(req)
     # Zona horaria (offset tipo +01:00)
     zona = _resolve_tz_offset(req.date, req.time, lat_f, lon_f)
 
-    # Carta
+    # Carta (CASAS IGUALES para que coincida con el widget)
     dt = Datetime(req.date, req.time, zona)
     pos = GeoPos(lat_str, lon_str)
-    ch = Chart(dt, pos, hsys=const.HOUSES_PLACIDUS)
+    ch = Chart(dt, pos, hsys=const.HOUSES_EQUAL)
 
-    # Posiciones
+    # Posiciones (planetas + ángulos)
     posiciones: Dict[str, float] = obtener_posiciones(ch)
 
     planets = {
@@ -143,10 +146,10 @@ def evaluate(req: EvalRequest):
     # Zona horaria
     zona = _resolve_tz_offset(req.birth.date, req.birth.time, lat_f, lon_f)
 
-    # Carta
+    # Carta (mismo sistema de casas que /chart para coherencia)
     dt = Datetime(req.birth.date, req.birth.time, zona)
     pos = GeoPos(lat_str, lon_str)
-    ch = Chart(dt, pos, hsys=const.HOUSES_PLACIDUS)
+    ch = Chart(dt, pos, hsys=const.HOUSES_EQUAL)
 
     posiciones = obtener_posiciones(ch)
     res = evalua_termino_con_carta(req.term, posiciones)
@@ -159,9 +162,7 @@ def evaluate(req: EvalRequest):
         "result": res
     }
 
-# ---------------------------
-# Main (local)
-# ---------------------------
+# --- Main local (útil para pruebas locales) ---
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
