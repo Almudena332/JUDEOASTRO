@@ -4,5 +4,7 @@ flatlib
 geopy
 timezonefinder
 tzdata
+backports.zoneinfo
 pytz
-pyswisseph==2.10.3.2
+
+
