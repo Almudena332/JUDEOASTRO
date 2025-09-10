@@ -12,43 +12,29 @@ from pydantic import BaseModel
 
 app = FastAPI(title="Astro API", version="1.0.0")
 
-# --- CORS (tus orígenes) ---
-ALLOWED = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://almudenacuervo.local",
-    "http://almudenacuervo.local:80",
-    "https://vivirenastrologico.com",
-    "http://vivirenastrologico.com",
-    "https://www.vivirenastrologico.com",
-    "http://www.vivirenastrologico.com",
-    "https://enastrologico.com",
-    "http://enastrologico.com",
-    "https://www.enastrologico.com",
-    "http://www.enastrologico.com",
-]
+# --- CORS: cubre localhost, almudenacuervo.local y tus .com (con/sin www) ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED,
+    allow_origin_regex=r"^https?://(localhost(:\d+)?|almudenacuervo\.local(:\d+)?|(www\.)?(vivirenastrologico|enastrologico)\.com)$",
     allow_credentials=True,
     allow_methods=["GET","POST","OPTIONS"],
     allow_headers=["*"],
 )
 
-# --- Modelos ---
+# ------------------- Modelos -------------------
 class Birth(BaseModel):
     date: str  # "YYYY/MM/DD"
     time: str  # "HH:MM"
     city: Optional[str] = None
     country: Optional[str] = None
-    lat: Optional[str] = None
+    lat: Optional[str] = None  # acepta decimal o DMS
     lon: Optional[str] = None
 
 class EvalRequest(BaseModel):
     birth: Birth
     term: str
 
-# --- Utilidades ---
+# ------------------- Utils -------------------
 def _to360(x: float) -> float:
     v = x % 360.0
     return v + 360.0 if v < 0 else v
@@ -57,8 +43,10 @@ def _sanitize(obj: Any) -> Any:
     if obj is None or isinstance(obj, (bool,int,float,str)):
         return obj
     if hasattr(obj, "lon"):
-        try: return float(obj.lon)
-        except: pass
+        try:
+            return float(obj.lon)
+        except:
+            pass
     if isinstance(obj, dict):
         return {str(k): _sanitize(v) for k,v in obj.items()}
     if isinstance(obj, (list,tuple)):
@@ -81,7 +69,6 @@ def _lazy_flatlib():
 def _lazy_astro():
     try:
         astro = importlib.import_module("astrogematria")
-        # deben existir estas funciones:
         for name in ["geocode_city","parse_geopos","tz_offset_from_coords",
                      "obtener_posiciones","evalua_termino_con_carta"]:
             if not hasattr(astro, name):
@@ -110,15 +97,18 @@ def _resolve_tz(astro, date_str: str, time_str: str, lat_f: float, lon_f: float)
         raise HTTPException(400, "Fecha/Hora inválidas. Usa YYYY/MM/DD y HH:MM.")
     return astro.tz_offset_from_coords(dt_local, lat_f, lon_f) or "+01:00"
 
-# --- Handler global para ver el stack en logs y JSON ---
+# --------- Handler global: log + JSON con detail ----------
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     print("=== Unhandled Exception ===")
     print(repr(exc))
-    import traceback; traceback.print_exc()
+    try:
+        import traceback; traceback.print_exc()
+    except Exception:
+        pass
     return JSONResponse(status_code=500, content={"error":"internal_error","detail":str(exc)})
 
-# --- Rutas básicas ---
+# ------------------- Rutas básicas -------------------
 @app.get("/")
 def root():
     return {"ok": True, "service": "astro-api", "version": app.version}
@@ -148,7 +138,7 @@ def diag():
             info["installed"][m] = f"missing/err: {e}"
     return info
 
-# --- Endpoints principales (imports perezosos) ---
+# ------------------- Endpoints principales -------------------
 @app.post("/chart")
 def chart(req: Birth):
     chart_mod, dtmod, geop, const = _lazy_flatlib()
@@ -159,9 +149,11 @@ def chart(req: Birth):
 
     dt = dtmod.Datetime(req.date, req.time, zona)
     pos = geop.GeoPos(lat_str, lon_str)
+    # CASAS IGUALES para cuadrar con la UI
     ch = chart_mod.Chart(dt, pos, hsys=const.HOUSES_EQUAL)
 
     posiciones: Dict[str, Any] = _sanitize(astro.obtener_posiciones(ch))
+
     planets_keys = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto']
     planets = {k: _to360(float(posiciones[k])) for k in planets_keys if k in posiciones}
     angles = {"ASC": _to360(float(posiciones['Asc'])), "MC": _to360(float(posiciones['MC']))}
@@ -189,6 +181,9 @@ def evaluate(req: EvalRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), log_level="debug")
+
+
+
 
 
 
