@@ -5,5 +5,3 @@ geopy
 timezonefinder
 tzdata
 pytz
-
-
