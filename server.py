@@ -12,11 +12,8 @@ from astrogematria import (
     obtener_posiciones, evalua_termino_con_carta
 )
 
-ALLOW_ORIGINS = [
-    "https://enastrologico.com",  # <-- pon tu dominio aquí cuando publiques
-    "http://127.0.0.1:5500",      # opcional: pruebas locales
-    "http://localhost:5173"
-]
+# En pruebas, déjalo en "*". En producción, pon tu dominio: ["https://enastrologico.com"]
+ALLOW_ORIGINS = ["*"]
 
 app = FastAPI(title="Astrogematría API")
 app.add_middleware(
@@ -40,7 +37,8 @@ class EvalRequest(BaseModel):
     term: str
 
 @app.get("/healthz")
-def healthz(): return {"ok": True}
+def healthz(): 
+    return {"ok": True}
 
 @app.post("/evaluate")
 def evaluate(req: EvalRequest):
@@ -70,6 +68,7 @@ def evaluate(req: EvalRequest):
 
     res = evalua_termino_con_carta(req.term, posiciones)
     return {"zone": zona, "lat": lat_str, "lon": lon_str, "positions": posiciones, "result": res}
+
 
 
 
