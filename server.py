@@ -16,6 +16,9 @@ from astrogematria import (
 ALLOW_ORIGINS = ["*"]
 
 app = FastAPI(title="Astrogematría API")
+@app.get("/healthz")
+def healthz():
+    return "OK"
 
 app.add_middleware(
     CORSMiddleware,
@@ -86,6 +89,7 @@ def evaluate(req: EvalRequest):
         "positions": posiciones,
         "result": res
     }
+
 
 
 
